@@ -26,6 +26,19 @@ except Exception as e:
     st.error(f"❌ OAuth error: {e}")
     st.stop()
 
+st.write("✅ Google authentication successful!")
+
+# Attempt to connect to Google Sheets
+try:
+    st.write("🔍 Connecting to Google Sheets...")
+    client = gspread.authorize(creds)  # ✅ Authorizing gspread
+    sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # Ensure correct sheet name
+    st.write("✅ Successfully connected to Google Sheets!")
+except Exception as e:
+    st.error(f"❌ Google Sheets connection failed: {e}")
+    st.stop()
+
+
 
 # ✅ Move this below `sheet` initialization
 def get_players():
