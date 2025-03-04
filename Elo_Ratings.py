@@ -5,6 +5,15 @@ import json
 import pandas as pd
 
 st.write("App is starting...")
+st.write("Checking secrets format...")
+
+try:
+    secret_value = st.secrets["gcp_service_account"]
+    st.write(f"Secret type: {type(secret_value)}")  # ✅ Debug: Check if it's a str or dict
+except Exception as e:
+    st.error(f"❌ Error reading secrets: {e}")
+    st.stop()
+
 
 # ✅ Load Google Sheets credentials
 try:
