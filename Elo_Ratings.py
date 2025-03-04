@@ -13,7 +13,7 @@ scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis
 
 try:
     st.write("Loading credentials...")
-    creds_dict = json.loads(st.secrets["gcp_service_account"])
+    creds_dict = st.secrets["gcp_service_account"]  # ✅ No need for json.loads()
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     st.write("Credentials loaded successfully!")  # ✅ Debug log
 except Exception as e:
