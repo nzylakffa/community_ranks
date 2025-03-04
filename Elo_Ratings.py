@@ -6,12 +6,27 @@ import pandas as pd
 import time
 import json
 
+st.write("App is starting...")  # ✅ Debug log
+
 # Google Sheets Setup
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-creds_dict = json.loads(st.secrets["gcp_service_account"])
-creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-client = gspread.authorize(creds)
-sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # Ensure it pulls from the correct sheet
+
+try:
+    st.write("Loading credentials...")
+    creds_dict = json.loads(st.secrets["gcp_service_account"])
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    st.write("Credentials loaded successfully!")  # ✅ Debug log
+except Exception as e:
+    st.error(f"Error loading credentials: {e}")
+
+try:
+    st.write("Connecting to Google Sheets...")
+    client = gspread.authorize(creds)
+    sheet = client.open("Community Elo Ratings").worksheet("Sheet1")
+    st.write("Successfully connected to Google Sheets!")  # ✅ Debug log
+except Exception as e:
+    st.error(f"Google Sheets connection failed: {e}")
+
 
 def get_players():
     player_data = sheet.get_all_records()
