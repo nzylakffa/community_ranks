@@ -4,10 +4,12 @@ from google.oauth2.service_account import Credentials
 import random
 import pandas as pd
 import time
+import json
 
 # Google Sheets Setup
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_file("creds.json", scopes=scope)
+creds_dict = json.loads(st.secrets["gcp_service_account"])
+creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
 client = gspread.authorize(creds)
 sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # Ensure it pulls from the correct sheet
 
