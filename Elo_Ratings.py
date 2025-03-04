@@ -4,27 +4,28 @@ from google.oauth2.service_account import Credentials
 import json
 import pandas as pd
 
-st.write("App is starting...")
-st.write("Checking secrets format...")
+st.write("🚀 Starting Debugging...")
 
+# ✅ 1. Check if the secret is loading
 try:
-    secret_value = st.secrets["gcp_service_account"]
-    st.write(f"Secret type: {type(secret_value)}")  # ✅ Debug: Check if it's a str or dict
+    creds_dict = st.secrets["gcp_service_account"]
+    st.write("✅ Successfully loaded secrets.")
 except Exception as e:
-    st.error(f"❌ Error reading secrets: {e}")
+    st.error(f"❌ Failed to load secrets: {e}")
     st.stop()
 
+# ✅ 2. Print the OAuth scopes being used
+scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+st.write(f"🔍 Using OAuth Scopes: {scope}")
 
-# ✅ Load Google Sheets credentials
+# ✅ 3. Try initializing credentials
 try:
-    creds_dict = st.secrets["gcp_service_account"]  # ✅ Use correct format
-    creds = Credentials.from_service_account_info(creds_dict)
-    client = gspread.authorize(creds)
-    sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # ✅ Now `sheet` exists
-    st.write("✅ Successfully connected to Google Sheets!")
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    st.write("✅ Credentials initialized successfully!")
 except Exception as e:
-    st.error(f"❌ Google Sheets connection failed: {e}")
-    st.stop()  # 🚨 Prevents execution if connection fails
+    st.error(f"❌ OAuth error: {e}")
+    st.stop()
+
 
 # ✅ Move this below `sheet` initialization
 def get_players():
