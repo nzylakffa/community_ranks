@@ -14,7 +14,6 @@ sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # Ensure corre
 # ✅ Move this below `sheet` initialization
 def get_players():
     try:
-        st.write("Fetching player data...")
         player_data = sheet.get_all_records()
         df = pd.DataFrame(player_data)
 
@@ -23,8 +22,6 @@ def get_players():
 
         df["pos_rank"] = df.groupby("pos")["elo"].rank(method="min", ascending=False).astype(int)
         df = df.sort_values(by="elo", ascending=False)
-
-        st.write(f"✅ Loaded {len(df)} players successfully!")
         return df
     except Exception as e:
         st.error(f"❌ Error fetching player data: {e}")
