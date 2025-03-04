@@ -1,45 +1,43 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-import random
-import pandas as pd
-import time
 import json
+import pandas as pd
 
-st.write("App is starting...")  # ✅ Debug log
+st.write("App is starting...")
 
-# Google Sheets Setup
-scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-
+# ✅ Load Google Sheets credentials
 try:
-    st.write("Loading credentials...")
-    creds_dict = st.secrets["gcp_service_account"]  # ✅ No need for json.loads()
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-    st.write("Credentials loaded successfully!")  # ✅ Debug log
-except Exception as e:
-    st.error(f"Error loading credentials: {e}")
-
-try:
-    st.write("Connecting to Google Sheets...")
+    creds_dict = st.secrets["gcp_service_account"]  # ✅ Use correct format
+    creds = Credentials.from_service_account_info(creds_dict)
     client = gspread.authorize(creds)
-    sheet = client.open("Community Elo Ratings").worksheet("Sheet1")
-    st.write("Successfully connected to Google Sheets!")  # ✅ Debug log
+    sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # ✅ Now `sheet` exists
+    st.write("✅ Successfully connected to Google Sheets!")
 except Exception as e:
-    st.error(f"Google Sheets connection failed: {e}")
+    st.error(f"❌ Google Sheets connection failed: {e}")
+    st.stop()  # 🚨 Prevents execution if connection fails
 
-
+# ✅ Move this below `sheet` initialization
 def get_players():
-    player_data = sheet.get_all_records()
-    df = pd.DataFrame(player_data)
-    
-    if "elo" not in df.columns or df["elo"].isnull().all():
-        df["elo"] = 1500  # Default Elo rating if missing
+    try:
+        st.write("Fetching player data...")
+        player_data = sheet.get_all_records()
+        df = pd.DataFrame(player_data)
 
-    # Calculate Positional Rankings
-    df["pos_rank"] = df.groupby("pos")["elo"].rank(method="min", ascending=False).astype(int)
-    
-    df = df.sort_values(by="elo", ascending=False)
-    return df
+        if "elo" not in df.columns or df["elo"].isnull().all():
+            df["elo"] = 1500  # Default Elo rating if missing
+
+        df["pos_rank"] = df.groupby("pos")["elo"].rank(method="min", ascending=False).astype(int)
+        df = df.sort_values(by="elo", ascending=False)
+
+        st.write(f"✅ Loaded {len(df)} players successfully!")
+        return df
+    except Exception as e:
+        st.error(f"❌ Error fetching player data: {e}")
+        return pd.DataFrame()
+
+# ✅ Call `get_players()` AFTER `sheet` is initialized
+players = get_players()
 
 # Elo Calculation (Moved Above Process_Vote)
 def calculate_elo(winner_elo, loser_elo, k=32):
@@ -49,8 +47,8 @@ def calculate_elo(winner_elo, loser_elo, k=32):
     new_loser_elo = loser_elo + k * (0 - expected_loser)
     return round(new_winner_elo), round(new_loser_elo)
 
-# Fetch players and pick two close in Elo with aggressive top weighting
-players = get_players()
+# # Fetch players and pick two close in Elo with aggressive top weighting
+# players = get_players()
 
 def aggressive_weighted_selection(df, weight_col="elo", alpha=10):
     max_elo = df[weight_col].max()
@@ -108,7 +106,7 @@ def update_google_sheet(player_name, new_elo):
         if "elo" in header_row:
             elo_col_index = header_row.index("elo") + 1  # Get column index dynamically
             sheet.update_cell(cell.row, elo_col_index, float(new_elo))  # Convert Elo to number
-            time.sleep(1)  # Ensure API update completes
+            # time.sleep(1)  # Ensure API update completes
         else:
             st.error("Elo column not found in Google Sheet")
     except gspread.exceptions.CellNotFound:
