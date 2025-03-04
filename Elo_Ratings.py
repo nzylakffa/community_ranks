@@ -5,41 +5,11 @@ import json
 import pandas as pd
 import random
 
-st.write("🚀 Starting Debugging...")
-
-# ✅ 1. Check if the secret is loading
-try:
-    creds_dict = st.secrets["gcp_service_account"]
-    st.write("✅ Successfully loaded secrets.")
-except Exception as e:
-    st.error(f"❌ Failed to load secrets: {e}")
-    st.stop()
-
-# ✅ 2. Print the OAuth scopes being used
+creds_dict = st.secrets["gcp_service_account"]
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-st.write(f"🔍 Using OAuth Scopes: {scope}")
-
-# ✅ 3. Try initializing credentials
-try:
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-    st.write("✅ Credentials initialized successfully!")
-except Exception as e:
-    st.error(f"❌ OAuth error: {e}")
-    st.stop()
-
-st.write("✅ Google authentication successful!")
-
-# Attempt to connect to Google Sheets
-try:
-    st.write("🔍 Connecting to Google Sheets...")
-    client = gspread.authorize(creds)  # ✅ Authorizing gspread
-    sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # Ensure correct sheet name
-    st.write("✅ Successfully connected to Google Sheets!")
-except Exception as e:
-    st.error(f"❌ Google Sheets connection failed: {e}")
-    st.stop()
-
-
+creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+client = gspread.authorize(creds)  # ✅ Authorizing gspread
+sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # Ensure correct sheet name
 
 # ✅ Move this below `sheet` initialization
 def get_players():
