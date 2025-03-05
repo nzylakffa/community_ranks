@@ -84,6 +84,7 @@ def get_user_data(force_refresh=False):
         else:
             df = pd.DataFrame(data)
             df.columns = df.columns.str.lower()
+            df["username"] = df["username"].str.lower()  # ✅ Normalize usernames to lowercase
             st.session_state["user_data_cache"] = df
 
     return st.session_state["user_data_cache"]  # ✅ Use cached data
@@ -92,10 +93,14 @@ def update_user_vote(username, count_vote=True):
     df = get_user_data()
     today = datetime.date.today().strftime("%Y-%m-%d")
 
-    # ✅ If user doesn't exist, add them
-    if df.empty or username not in df["username"].values:
+    # ✅ Convert to lowercase to ensure case-insensitive lookup
+    df["username"] = df["username"].str.lower()
+    username_lower = username.lower()
+    
+    if df.empty or username_lower not in df["username"].values:
         votes_sheet.append_row([username, 1 if count_vote else 0, 1 if count_vote else 0, today])
         return
+
 
     row_idx = df[df["username"] == username].index[0] + 2
     values = votes_sheet.row_values(row_idx)
