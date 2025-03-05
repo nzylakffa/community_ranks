@@ -314,10 +314,14 @@ if st.session_state["selected_player"]:
     # ✅ Load leaderboard data
     df = get_user_data()
     
-    # 🏆 All-Time Leaderboard (Sorted by All Time Votes)
+    # Ensure columns are numeric before sorting
+    df["total_votes"] = pd.to_numeric(df["total_votes"], errors="coerce").fillna(0).astype(int)
+    df["weekly_votes"] = pd.to_numeric(df["weekly_votes"], errors="coerce").fillna(0).astype(int)
+    
+    # 🏆 All-Time Leaderboard (Sorted by All Time Votes - Highest First)
     st.markdown("## 🏆 All-Time Leaderboard (Total Votes)")
-    df_all_time = df.copy().sort_values(by="total_votes", ascending=False).head(5)  # Sort by all time votes
-    df_all_time["Rank"] = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][: len(df_all_time)]  # Assign ranking icons
+    df_all_time = df.copy().sort_values(by="total_votes", ascending=False).head(5)  # ✅ Sort descending
+    df_all_time["Rank"] = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][: len(df_all_time)]  # ✅ Assign ranking icons
     df_all_time = df_all_time.rename(
         columns={
             "username": "Username",
@@ -328,10 +332,10 @@ if st.session_state["selected_player"]:
     df_all_time = df_all_time[["Rank", "Username", "All Time Votes", "Last Voted"]]  # ✅ Remove Weekly Votes
     st.dataframe(df_all_time.set_index("Rank"), hide_index=False, use_container_width=True)
     
-    # ⏳ Weekly Leaderboard (Sorted by Weekly Votes)
+    # ⏳ Weekly Leaderboard (Sorted by Weekly Votes - Highest First)
     st.markdown("## ⏳ Weekly Leaderboard (Resets on Monday)")
-    df_weekly = df.copy().sort_values(by="weekly_votes", ascending=False).head(5)  # Sort by weekly votes
-    df_weekly["Rank"] = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][: len(df_weekly)]  # Assign ranking icons
+    df_weekly = df.copy().sort_values(by="weekly_votes", ascending=False).head(5)  # ✅ Sort descending
+    df_weekly["Rank"] = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][: len(df_weekly)]  # ✅ Assign ranking icons
     df_weekly = df_weekly.rename(
         columns={
             "username": "Username",
@@ -341,6 +345,7 @@ if st.session_state["selected_player"]:
     )  # ✅ Rename columns
     df_weekly = df_weekly[["Rank", "Username", "Weekly Votes", "Last Voted"]]  # ✅ Remove All Time Votes
     st.dataframe(df_weekly.set_index("Rank"), hide_index=False, use_container_width=True)
+
 
     # "Next Matchup" button appears here, after Elo ratings are shown
     st.markdown("<div style='text-align: center; margin-top: 20px;'>", unsafe_allow_html=True)
