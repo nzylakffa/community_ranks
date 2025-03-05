@@ -192,9 +192,7 @@ def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new
 
 def process_vote(selected_player):
     # ✅ Show Status Message While Processing
-    with st.status("Submitting your pick and adjusting the rankings! ⏳", expanded=True) as status:
-        st.write("Processing your pick...")
-        
+    with st.status("Submitting your pick and adjusting the rankings! ⏳", expanded=False) as status:        
         if selected_player == player1["name"]:
             new_elo1, new_elo2 = calculate_elo(player1["elo"], player2["elo"])
         else:
