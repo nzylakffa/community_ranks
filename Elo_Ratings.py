@@ -58,6 +58,22 @@ def get_player_value(player_name):
         st.error(f"❌ Error fetching player value: {e}")
         return None
 
+def get_player_elo(player_name):
+    """Fetches the Elo rating for a given player from cached player data."""
+    try:
+        df = st.session_state["players_cache"]  # ✅ Use cached players data
+
+        # Find player and get their Elo
+        player_row = df[df["name"].str.lower() == player_name.lower()]
+        if not player_row.empty:
+            return float(player_row["elo"].values[0])  # Convert Elo to float
+        else:
+            return None  # Player not found
+
+    except Exception as e:
+        st.error(f"❌ Error fetching player Elo: {e}")
+        return None
+
 def get_user_data():
     if "user_data_cache" not in st.session_state:  # ✅ Cache results
         data = votes_sheet.get_all_records()
@@ -134,35 +150,43 @@ def aggressive_weighted_selection(df, weight_col="elo", alpha=10):
 
 def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new_elo):
     try:
-        all_values = sheet.get_all_values()
-        header_row = all_values[0]
+        df = st.session_state["players_cache"]  # ✅ Use cached player data
+        header_row = sheet.row_values(1)  # ✅ Get headers once
 
         elo_col_index = header_row.index("elo") + 1
         votes_col_index = header_row.index("Votes") + 1 if "Votes" in header_row else None
 
-        player1_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player1_name.lower()), None)
-        player2_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player2_name.lower()), None)
+        # ✅ Fetch Elo instantly from memory
+        player1_elo = get_player_elo(player1_name)
+        player2_elo = get_player_elo(player2_name)
 
-        if not player1_row or not player2_row:
-            return
+        # ✅ Get row indices from cache instead of API calls
+        player1_row = df[df["name"].str.lower() == player1_name.lower()]
+        player2_row = df[df["name"].str.lower() == player2_name.lower()]
+
+        if player1_row.empty or player2_row.empty:
+            return  # ✅ Prevent errors if players aren't found
+
+        player1_row_idx = player1_row.index[0] + 2
+        player2_row_idx = player2_row.index[0] + 2
 
         updates = []
 
-        # ✅ Only update if the values are different
-        if float(player1_new_elo) != float(all_values[player1_row - 1][elo_col_index - 1]):
-            updates.append({"range": f"R{player1_row}C{elo_col_index}", "values": [[float(player1_new_elo)]]})
+        # ✅ Only update Elo if it's changed
+        if float(player1_new_elo) != float(player1_elo):
+            updates.append({"range": f"R{player1_row_idx}C{elo_col_index}", "values": [[float(player1_new_elo)]]})
 
-        if float(player2_new_elo) != float(all_values[player2_row - 1][elo_col_index - 1]):
-            updates.append({"range": f"R{player2_row}C{elo_col_index}", "values": [[float(player2_new_elo)]]})
+        if float(player2_new_elo) != float(player2_elo):
+            updates.append({"range": f"R{player2_row_idx}C{elo_col_index}", "values": [[float(player2_new_elo)]]})
 
         if votes_col_index:
-            player1_votes = int(all_values[player1_row - 1][votes_col_index - 1] or 0) + 1
-            player2_votes = int(all_values[player2_row - 1][votes_col_index - 1] or 0) + 1
+            player1_votes = int(player1_row["Votes"].values[0]) + 1
+            player2_votes = int(player2_row["Votes"].values[0]) + 1
 
-            if player1_votes != int(all_values[player1_row - 1][votes_col_index - 1]):
-                updates.append({"range": f"R{player1_row}C{votes_col_index}", "values": [[player1_votes]]})
-            if player2_votes != int(all_values[player2_row - 1][votes_col_index - 1]):
-                updates.append({"range": f"R{player2_row}C{votes_col_index}", "values": [[player2_votes]]})
+            if player1_votes != int(player1_row["Votes"].values[0]):
+                updates.append({"range": f"R{player1_row_idx}C{votes_col_index}", "values": [[player1_votes]]})
+            if player2_votes != int(player2_row["Votes"].values[0]):
+                updates.append({"range": f"R{player2_row_idx}C{votes_col_index}", "values": [[player2_votes]]})
 
         if updates:
             sheet.batch_update(updates)  # ✅ Only update if changes were detected
@@ -236,13 +260,22 @@ if "updated_elo" not in st.session_state:
 player1 = st.session_state.player1
 player2 = st.session_state.player2
 
-# ✅ Get player values from the second sheet
+# ✅ Fetch Elo instantly instead of API calls
+player1_elo = get_player_elo(player1["name"])
+player2_elo = get_player_elo(player2["name"])
+
+# ✅ Fetch Value from HPPR Sheet (like before)
 player1_value = get_player_value(player1["name"])
 player2_value = get_player_value(player2["name"])
 
-# ✅ Determine Nick's Pick (Highest Value)
+# ✅ Determine Nick's Pick (Highest Value with Elo Tie-Breaker)
 if player1_value is not None and player2_value is not None:
-    nicks_pick = player1["name"] if player1_value > player2_value else player2["name"]
+    if player1_value > player2_value:
+        nicks_pick = player1["name"]
+    elif player2_value > player1_value:
+        nicks_pick = player2["name"]
+    else:  # Tie-breaker using Elo
+        nicks_pick = player1["name"] if player1_elo > player2_elo else player2["name"]
 else:
     nicks_pick = "N/A"  # Default if values are missing
 
