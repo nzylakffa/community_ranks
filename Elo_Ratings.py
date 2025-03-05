@@ -302,7 +302,7 @@ if st.session_state["selected_player"]:
             unsafe_allow_html=True
         )
     # ✅ Display Nick's Pick Below Elo Ratings
-    st.markdown(f"<h4 style='text-align: center;'>🔒 Nick Would Have Picked: <b>{nicks_pick}</b></h4>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-size:18px;'><b>Nick Would Have Picked:</b> {nicks_pick}</p>", unsafe_allow_html=True)
 
 
     # ✅ Load leaderboard data
