@@ -52,7 +52,7 @@ def get_player_value(player_name):
     return float(player_row["Value"].values[0]) if not player_row.empty else None
 
 
-def update_user_vote(username, count_vote=True, user_data):
+def update_user_vote(username, user_data, count_vote=True):
     """Updates user vote data in Google Sheets without extra read requests."""
     df = user_data  # Use preloaded data
     username_lower = username.lower()
