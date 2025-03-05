@@ -101,8 +101,8 @@ def update_google_sheet(player_name, new_elo):
             sheet.update_cell(cell.row, elo_col_index, float(new_elo))  # Convert Elo to number
 
         # ✅ Update Count column dynamically
-        if "Count" in header_row:
-            count_col_index = header_row.index("Count") + 1  # Convert to 1-based index
+        if "Votes" in header_row:
+            count_col_index = header_row.index("Votes") + 1  # Convert to 1-based index
             current_count = sheet.cell(cell.row, count_col_index).value  # Get current count
             new_count = int(current_count) + 1 if current_count and current_count.isdigit() else 1
             sheet.update_cell(cell.row, count_col_index, new_count)  # Increment count
