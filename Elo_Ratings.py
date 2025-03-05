@@ -91,17 +91,19 @@ def calculate_elo(winner_elo, loser_elo, k=24):
 # players = get_players()
 
 def aggressive_weighted_selection(df, weight_col="elo", alpha=10):
+    df = df.copy()  # ✅ Ensure modifications are on a separate copy
+
     max_elo = df[weight_col].max()
     min_elo = df[weight_col].min()
     
     # Normalize Elo scores to avoid extreme weighting
-    df["normalized_elo"] = (df[weight_col] - min_elo) / (max_elo - min_elo)
+    df.loc[:, "normalized_elo"] = (df[weight_col] - min_elo) / (max_elo - min_elo)
     
     # Exponentiate with alpha for stronger weighting on higher Elo players
-    df["weight"] = df["normalized_elo"] ** alpha
+    df.loc[:, "weight"] = df["normalized_elo"] ** alpha
     
     # Normalize weights to sum to 1 (softmax-like effect)
-    df["weight"] = df["weight"] / df["weight"].sum()
+    df.loc[:, "weight"] = df["weight"] / df["weight"].sum()
     
     # Select based on weighted probability
     selected_index = random.choices(df.index, weights=df["weight"], k=1)[0]
