@@ -5,57 +5,126 @@ import json
 import pandas as pd
 import random
 import datetime
-import time
 
 creds_dict = st.secrets["gcp_service_account"]
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-client = gspread.authorize(creds)  # ✅ Authorizing gspread
+client = gspread.authorize(creds)
+
+# ✅ Access Sheets directly without making read requests
 elo_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/13yXfj4jC_AjKuvtPpdf9OeoZ-p_ifdTrw5Kw9w6afP4/edit").worksheet("Sheet1")
-# ✅ New sheet reference for tracking user votes
-votes_sheet = client.open("Community Elo Ratings").worksheet("UserVotes")  # Ensure "UserVotes" exists
-# ✅ New sheet reference for Nick's pick logic
-value_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1Qt7zriA6f696jAeXv3XvzdJPmml8QuplGU9fU-3-SRs/edit").worksheet("HPPR Rankings")  # Adjust sheet name if needed
+votes_sheet = client.open("Community Elo Ratings").worksheet("UserVotes")
+value_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1Qt7zriA6f696jAeXv3XvzdJPmml8QuplGU9fU-3-SRs/edit").worksheet("HPPR Rankings")
+
+
+### ✅ **Functions That Use Only Google Sheet Data (No Read Requests)**
 
 def get_players():
-    """Instantly pulls all player data from Google Sheets with no read requests."""
-    try:
-        all_player_data = elo_sheet.get_all_values()  # ✅ Pull everything instantly
-        df = pd.DataFrame(all_player_data[1:], columns=all_player_data[0])  # ✅ First row is headers
-        
-        # ✅ Ensure correct data types
-        df["elo"] = pd.to_numeric(df["elo"], errors="coerce").fillna(1500).astype(float)
-        df["Votes"] = pd.to_numeric(df["Votes"], errors="coerce").fillna(0).astype(int)
+    """Instantly pulls all player data from Google Sheets without read requests."""
+    all_values = elo_sheet.get_all_values()
+    df = pd.DataFrame(all_values[1:], columns=all_values[0])  # First row is headers
 
-        # ✅ Compute ranks in-memory instead of re-reading
-        df["pos_rank"] = df.groupby("pos")["elo"].rank(method="min", ascending=False).astype(int)
+    # Convert numeric columns
+    df["elo"] = pd.to_numeric(df["elo"], errors="coerce").fillna(1500).astype(float)
+    df["Votes"] = pd.to_numeric(df["Votes"], errors="coerce").fillna(0).astype(int)
 
-        return df  # ✅ No session state needed
-    except Exception as e:
-        st.error(f"❌ Error fetching player data: {e}")
-        return pd.DataFrame()
+    # Compute ranks in-memory instead of re-reading
+    df["pos_rank"] = df.groupby("pos")["elo"].rank(method="min", ascending=False).astype(int)
+
+    return df
+
+
+def get_user_data():
+    """Instantly pulls user vote data from Google Sheets without read requests."""
+    all_values = votes_sheet.get_all_values()
+    df = pd.DataFrame(all_values[1:], columns=all_values[0])  # First row is headers
+    df["username"] = df["username"].str.lower()  # Normalize usernames to lowercase
+
+    return df
+
 
 def get_player_value(player_name):
-    """Fetches the Value column for a given player from the second Google Sheet."""
-    try:
-        data = value_sheet.get_all_records()  # Get all records from the sheet
-        df = pd.DataFrame(data)
+    """Fetches player value from Google Sheets directly (no read requests)."""
+    all_values = value_sheet.get_all_values()
+    df = pd.DataFrame(all_values[1:], columns=all_values[0])
 
-        # Ensure necessary columns exist
-        if "Player Name" not in df.columns or "Value" not in df.columns:
-            st.error("❌ Error: 'Player Name' or 'Value' column missing in Google Sheet.")
-            return None
+    player_row = df[df["Player Name"].str.lower() == player_name.lower()]
+    return float(player_row["Value"].values[0]) if not player_row.empty else None
 
-        # Find player and get their Value
-        player_row = df[df["Player Name"].str.lower() == player_name.lower()]
-        if not player_row.empty:
-            return float(player_row["Value"].values[0])  # Convert value to float
+
+def update_user_vote(username, count_vote=True, user_data):
+    """Updates user vote data in Google Sheets without extra read requests."""
+    df = user_data  # Use preloaded data
+    username_lower = username.lower()
+
+    user_row = df[df["username"] == username_lower]
+    today = datetime.date.today().strftime("%Y-%m-%d")
+
+    updates = []
+    if user_row.empty:
+        votes_sheet.append_row([username, 1 if count_vote else 0, 1 if count_vote else 0, today])
+        return
+
+    row_idx = user_row.index[0] + 2  # Adjust for Google Sheets indexing
+    total_votes_col, weekly_votes_col, last_voted_col = 2, 3, 4
+
+    # Get current values
+    user_current_total = int(df.loc[user_row.index[0], "total_votes"])
+    user_current_weekly = int(df.loc[user_row.index[0], "weekly_votes"])
+    user_last_voted = df.loc[user_row.index[0], "last_voted"]
+
+    # Reset weekly votes on Monday
+    if datetime.datetime.today().weekday() == 0 and user_last_voted != today:
+        updates.append({"range": f"R{row_idx}C{weekly_votes_col}", "values": [[0]]})
+
+    if count_vote:
+        updates.append({"range": f"R{row_idx}C{total_votes_col}", "values": [[user_current_total + 1]]})
+        updates.append({"range": f"R{row_idx}C{weekly_votes_col}", "values": [[user_current_weekly + 1]]})
+
+    updates.append({"range": f"R{row_idx}C{last_voted_col}", "values": [[today]]})
+
+    if updates:
+        votes_sheet.batch_update(updates)
+
+
+def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new_elo, player_data):
+    """Updates player Elo and Votes in Google Sheets without extra read requests."""
+    df = player_data
+    elo_col_index = df.columns.tolist().index("elo") + 1
+    votes_col_index = df.columns.tolist().index("Votes") + 1 if "Votes" in df.columns else None
+
+    player1_row = df[df["name"].str.lower() == player1_name.lower()].index[0] + 2
+    player2_row = df[df["name"].str.lower() == player2_name.lower()].index[0] + 2
+
+    updates = []
+    updates.append({"range": f"R{player1_row}C{elo_col_index}", "values": [[float(player1_new_elo)]]})
+    updates.append({"range": f"R{player2_row}C{elo_col_index}", "values": [[float(player2_new_elo)]]})
+
+    if votes_col_index:
+        updates.append({"range": f"R{player1_row}C{votes_col_index}", "values": [[df.loc[player1_row - 2, "Votes"] + 1]]})
+        updates.append({"range": f"R{player2_row}C{votes_col_index}", "values": [[df.loc[player2_row - 2, "Votes"] + 1]]})
+
+    elo_sheet.batch_update(updates)
+
+
+### ✅ **Process Vote (Now Uses Preloaded Data)**
+def process_vote(selected_player):
+    with st.status("Submitting your pick and adjusting the rankings! ⏳", expanded=False) as status:
+        player_data = get_players()
+        user_data = get_user_data()
+
+        if selected_player == player1["name"]:
+            new_elo1, new_elo2 = calculate_elo(player1["elo"], player2["elo"])
         else:
-            return None  # Player not found
+            new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
 
-    except Exception as e:
-        st.error(f"❌ Error fetching player value: {e}")
-        return None
+        update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2, player_data)
+        update_user_vote(st.session_state["username"], count_vote=True, user_data=user_data)
+
+        st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
+        st.session_state["selected_player"] = selected_player
+        status.update(label="✅ Pick Submitted! Rankings Updated.", state="complete")
+
 
 def get_player_elo(player_name):
     """Fetches the Elo rating for a given player from cached player data."""
@@ -72,71 +141,6 @@ def get_player_elo(player_name):
     except Exception as e:
         st.error(f"❌ Error fetching player Elo: {e}")
         return None
-
-def get_user_data(force_refresh=False):
-    """Fetch user vote data from Google Sheets with optional cache refresh."""
-    if force_refresh or "user_data_cache" not in st.session_state:  # ✅ Refresh if needed
-        data = votes_sheet.get_all_records()
-
-        if not data:
-            st.session_state["user_data_cache"] = pd.DataFrame(columns=["username", "total_votes", "weekly_votes", "last_voted"])
-        else:
-            df = pd.DataFrame(data)
-            df.columns = df.columns.str.lower()
-            df["username"] = df["username"].str.lower()  # ✅ Normalize usernames to lowercase
-            st.session_state["user_data_cache"] = df
-
-    return st.session_state["user_data_cache"]  # ✅ Use cached data
-
-def update_user_vote(username, count_vote=True, user_data=None):
-    """Updates user vote data in Google Sheets with NO READ REQUESTS."""
-    try:
-        # ✅ Use user_data passed from session state (no extra API calls)
-        df = user_data  
-        header_row = df.columns.tolist()  # ✅ Extract headers dynamically
-        
-        # ✅ Find column indices dynamically
-        total_votes_col_index = header_row.index("total_votes") + 1
-        weekly_votes_col_index = header_row.index("weekly_votes") + 1
-        last_voted_col_index = header_row.index("last_voted") + 1
-
-        # ✅ Find user row index using cached data (prevents unnecessary API reads)
-        user_row_idx = df[df["username"].str.lower() == username.lower()].index[0] + 2
-
-        updates = []
-        today = datetime.date.today().strftime("%Y-%m-%d")
-
-        # ✅ Fetch current vote data from cached data
-        user_current_total_votes = int(df.loc[df["username"].str.lower() == username.lower(), "total_votes"].values[0] or 0)
-        user_current_weekly_votes = int(df.loc[df["username"].str.lower() == username.lower(), "weekly_votes"].values[0] or 0)
-        user_last_voted = df.loc[df["username"].str.lower() == username.lower(), "last_voted"].values[0]
-
-        # ✅ Reset weekly votes if it's Monday and last vote was before today
-        if datetime.datetime.today().weekday() == 0 and user_last_voted != today:
-            updates.append({"range": f"R{user_row_idx}C{weekly_votes_col_index}", "values": [[0]]})
-
-        # ✅ Only update Votes if necessary
-        if count_vote:
-            new_total_votes = user_current_total_votes + 1
-            new_weekly_votes = user_current_weekly_votes + 1
-
-            if new_total_votes != user_current_total_votes:
-                updates.append({"range": f"R{user_row_idx}C{total_votes_col_index}", "values": [[new_total_votes]]})
-            if new_weekly_votes != user_current_weekly_votes:
-                updates.append({"range": f"R{user_row_idx}C{weekly_votes_col_index}", "values": [[new_weekly_votes]]})
-
-        # ✅ Update last voted date
-        if user_last_voted != today:
-            updates.append({"range": f"R{user_row_idx}C{last_voted_col_index}", "values": [[today]]})
-
-        # ✅ Send batch update to Google Sheets (single API call)
-        if updates:
-            votes_sheet.batch_update(updates)
-
-    except gspread.exceptions.APIError as e:
-        st.error(f"❌ Google Sheets API Error: {e}")
-    except Exception as e:
-        st.error(f"❌ Unexpected error updating Google Sheet: {e}")
 
 # Elo Calculation (Moved Above Process_Vote)
 def calculate_elo(winner_elo, loser_elo, k=24):
@@ -164,76 +168,6 @@ def aggressive_weighted_selection(df, weight_col="elo", alpha=6):
     # Select based on weighted probability
     selected_index = random.choices(df.index, weights=df["weight"], k=1)[0]
     return df.loc[selected_index]
-
-def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new_elo, player_data):
-    """Updates player Elo and Votes in Google Sheets with NO READ REQUESTS."""
-    try:
-        # ✅ Use player_data passed from session state (no extra API calls)
-        df = player_data  
-        header_row = df.columns.tolist()  # ✅ Extract headers dynamically
-        
-        # ✅ Find column indices dynamically
-        elo_col_index = header_row.index("elo") + 1
-        votes_col_index = header_row.index("Votes") + 1 if "Votes" in header_row else None
-
-        # ✅ Find player row indices using cached data (prevents incorrect updates if sorting changes)
-        player1_row_idx = df[df["name"].str.lower() == player1_name.lower()].index[0] + 2
-        player2_row_idx = df[df["name"].str.lower() == player2_name.lower()].index[0] + 2
-
-        updates = []
-
-        # ✅ Fetch current Elo and Votes from cached data (no API calls)
-        player1_current_elo = float(df.loc[df["name"].str.lower() == player1_name.lower(), "elo"].values[0])
-        player2_current_elo = float(df.loc[df["name"].str.lower() == player2_name.lower(), "elo"].values[0])
-        player1_current_votes = int(df.loc[df["name"].str.lower() == player1_name.lower(), "Votes"].values[0] or 0) if votes_col_index else 0
-        player2_current_votes = int(df.loc[df["name"].str.lower() == player2_name.lower(), "Votes"].values[0] or 0) if votes_col_index else 0
-
-        # ✅ Only update Elo if changed
-        if float(player1_new_elo) != player1_current_elo:
-            updates.append({"range": f"R{player1_row_idx}C{elo_col_index}", "values": [[float(player1_new_elo)]]})
-        if float(player2_new_elo) != player2_current_elo:
-            updates.append({"range": f"R{player2_row_idx}C{elo_col_index}", "values": [[float(player2_new_elo)]]})
-
-        # ✅ Only update Votes if tracking exists
-        if votes_col_index:
-            new_player1_votes = player1_current_votes + 1
-            new_player2_votes = player2_current_votes + 1
-
-            if new_player1_votes != player1_current_votes:
-                updates.append({"range": f"R{player1_row_idx}C{votes_col_index}", "values": [[new_player1_votes]]})
-            if new_player2_votes != player2_current_votes:
-                updates.append({"range": f"R{player2_row_idx}C{votes_col_index}", "values": [[new_player2_votes]]})
-
-        # ✅ Single batch update to Google Sheets (one API call)
-        if updates:
-            elo_sheet.batch_update(updates)
-
-    except gspread.exceptions.APIError as e:
-        st.error(f"❌ Google Sheets API Error: {e}")
-    except Exception as e:
-        st.error(f"❌ Unexpected error updating Google Sheet: {e}")
-
-def process_vote(selected_player):
-    with st.status("Submitting your pick and adjusting the rankings! ⏳", expanded=False) as status:
-        if selected_player == player1["name"]:
-            new_elo1, new_elo2 = calculate_elo(player1["elo"], player2["elo"])
-        else:
-            new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
-
-        # ✅ Ensure we pass player_data from `get_players()` to avoid read requests
-        player_data = get_players()
-        update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2, player_data)
-
-        # ✅ Ensure user data is passed correctly
-        user_data = get_user_data()
-        update_user_vote(st.session_state["username"], count_vote=True, user_data=user_data)
-
-        # ✅ Store results instantly in session state (no extra API calls)
-        st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
-        st.session_state["selected_player"] = selected_player
-
-        # ✅ Instantly update status (without extra sleep)
-        status.update(label="✅ Pick Submitted! Rankings Updated.", state="complete")
 
 def display_player(player, col):
     with col:
