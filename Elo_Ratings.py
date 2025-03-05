@@ -301,9 +301,16 @@ if st.session_state["selected_player"]:
             f"</div>",
             unsafe_allow_html=True
         )
-    # ✅ Display Nick's Pick Below Elo Ratings
-    st.markdown(f"<p style='font-size:18px;'><b>Nick Would Have Picked:</b> {nicks_pick}</p>", unsafe_allow_html=True)
-
+    # ✅ Check if Nick’s Pick Matches the User’s Pick
+    match_icon = "✅" if nicks_pick == st.session_state["selected_player"] else "❌"
+    
+    # ✅ Display Nick's Pick with Padding and Match Indicator
+    st.markdown(
+        f"<div style='font-size:18px; padding: 5px;'>"
+        f"<b>Nick Would Have Picked:</b> {nicks_pick} {match_icon}"
+        f"</div>",
+        unsafe_allow_html=True
+    )
 
     # ✅ Load leaderboard data
     df = get_user_data()
