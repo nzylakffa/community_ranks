@@ -31,34 +31,45 @@ def get_players():
         st.error(f"❌ Error fetching player data: {e}")
         return pd.DataFrame()
 
-# ✅ Load user vote data from Google Sheets
+# ✅ Load user vote data from Google Sheets (Handles empty sheets)
 def get_user_data():
     data = votes_sheet.get_all_records()
-    return pd.DataFrame(data)
+    
+    # ✅ Handle empty Google Sheet (only headers, no data)
+    if not data:
+        return pd.DataFrame(columns=["username", "total_votes", "weekly_votes", "last_voted"])  # ✅ Create empty DataFrame
+    
+    df = pd.DataFrame(data)
+    df.columns = df.columns.str.lower()  # ✅ Ensure lowercase column names for consistency
+
+    st.write("Debug: UserVotes DataFrame", df)  # ✅ Debugging output
+    return df
 
 # ✅ Update votes for a user and reset weekly votes on Monday
 def update_user_vote(username):
     df = get_user_data()
     today = datetime.date.today().strftime("%Y-%m-%d")
-    
-    if username in df["username"].values:
-        row_idx = df[df["username"] == username].index[0] + 2  # Adjust index for Google Sheets
-        total_votes = int(votes_sheet.cell(row_idx, 2).value)  # Column 2 = total_votes
-        weekly_votes = int(votes_sheet.cell(row_idx, 3).value)  # Column 3 = weekly_votes
-        last_voted = votes_sheet.cell(row_idx, 4).value  # Column 4 = last_voted (date)
 
-        # ✅ Reset weekly votes if it's Monday and last vote was before today
-        if datetime.datetime.today().weekday() == 0 and last_voted != today:
-            votes_sheet.update_cell(row_idx, 3, 0)  # Reset weekly_votes
-
-        # ✅ Update vote counts
-        votes_sheet.update_cell(row_idx, 2, total_votes + 1)  # Increment total_votes
-        votes_sheet.update_cell(row_idx, 3, weekly_votes + 1)  # Increment weekly_votes
-        votes_sheet.update_cell(row_idx, 4, today)  # Update last_voted date
-    else:
-        # ✅ Add new user if not found
+    # ✅ If DataFrame is empty or username doesn't exist, add the user
+    if df.empty or username not in df["username"].values:
+        st.warning(f"New user added: {username}")
         votes_sheet.append_row([username, 1, 1, today])  # [username, total_votes, weekly_votes, last_voted]
+        return  # ✅ Exit function after adding new user
 
+    # ✅ If user exists, update their vote counts
+    row_idx = df[df["username"] == username].index[0] + 2  # Adjust index for Google Sheets
+    total_votes = int(votes_sheet.cell(row_idx, 2).value)  # Column 2 = total_votes
+    weekly_votes = int(votes_sheet.cell(row_idx, 3).value)  # Column 3 = weekly_votes
+    last_voted = votes_sheet.cell(row_idx, 4).value  # Column 4 = last_voted (date)
+
+    # ✅ Reset weekly votes if it's Monday and last vote was before today
+    if datetime.datetime.today().weekday() == 0 and last_voted != today:
+        votes_sheet.update_cell(row_idx, 3, 0)  # Reset weekly_votes
+
+    # ✅ Update vote counts
+    votes_sheet.update_cell(row_idx, 2, total_votes + 1)  # Increment total_votes
+    votes_sheet.update_cell(row_idx, 3, weekly_votes + 1)  # Increment weekly_votes
+    votes_sheet.update_cell(row_idx, 4, today)  # Update last_voted date
 
 # ✅ Call `get_players()` AFTER `sheet` is initialized
 players = get_players()
