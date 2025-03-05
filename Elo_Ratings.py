@@ -43,14 +43,13 @@ def get_user_data():
 
     return df  # ✅ Cleaned up, no debug output
 
-def update_user_vote(username):
+def update_user_vote(username, count_vote=True):
     df = get_user_data()
     today = datetime.date.today().strftime("%Y-%m-%d")
 
     # ✅ If DataFrame is empty or username doesn't exist, add the user
     if df.empty or username not in df["username"].values:
-        st.warning(f"New user added: {username}")
-        votes_sheet.append_row([username, 1, 1, today])  # ✅ Initialize with 1 vote
+        votes_sheet.append_row([username, 1 if count_vote else 0, 1 if count_vote else 0, today])  # ✅ Initialize with 1 vote only if count_vote=True
         return  # ✅ Exit after adding a new user
 
     # ✅ If user exists, update their vote counts
@@ -68,10 +67,12 @@ def update_user_vote(username):
     if datetime.datetime.today().weekday() == 0 and last_voted != today:
         votes_sheet.update_cell(row_idx, 3, 0)  # ✅ Reset weekly_votes
 
-    # ✅ Update vote counts
-    votes_sheet.update_cell(row_idx, 2, total_votes + 1)  # Increment total_votes
-    votes_sheet.update_cell(row_idx, 3, weekly_votes + 1)  # Increment weekly_votes
-    votes_sheet.update_cell(row_idx, 4, today)  # Update last_voted date
+    # ✅ Only count votes once per selection
+    if count_vote:
+        votes_sheet.update_cell(row_idx, 2, total_votes + 1)  # Increment total_votes
+        votes_sheet.update_cell(row_idx, 3, weekly_votes + 1)  # Increment weekly_votes
+    
+    votes_sheet.update_cell(row_idx, 4, today)  # ✅ Update last_voted date
 
 
 # ✅ Call `get_players()` AFTER `sheet` is initialized
@@ -132,13 +133,13 @@ if "updated_elo" not in st.session_state:
 player1 = st.session_state.player1
 player2 = st.session_state.player2
 
-# ✅ Username Input
+# ✅ Username Input (No Extra Vote Count Here)
 st.markdown("### Enter Your Username to Track Your Rank:")
 username = st.text_input("Username", value=st.session_state.get("username", ""), max_chars=15)
 
-if username:
+if username and "username" not in st.session_state:
     st.session_state["username"] = username
-    update_user_vote(username)  # ✅ Track votes in Google Sheets
+    update_user_vote(username, count_vote=False)  # ✅ Only track user, don't count extra vote
 
 # Streamlit UI
 st.markdown("<h1 style='text-align: center;'>Who Would You Rather Draft?</h1>", unsafe_allow_html=True)
@@ -191,10 +192,11 @@ def process_vote(selected_player):
     else:
         new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
 
-    # ✅ Single batch update instead of multiple read/write calls
+    # ✅ Ensure only 1 vote is counted per selection
     update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2)
+    update_user_vote(st.session_state["username"], count_vote=True)  # ✅ Count vote here only
 
-    # ✅ Store new Elo values in session state to update UI instantly
+    # ✅ Store new Elo values in session state
     st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
     st.session_state["selected_player"] = selected_player
 
