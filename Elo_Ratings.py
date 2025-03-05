@@ -137,7 +137,7 @@ player1 = st.session_state.player1
 player2 = st.session_state.player2
 
 # ✅ Username Input (No Extra Vote Count Here)
-st.markdown("### Enter Your Username to Track Your Rank:")
+st.markdown("<h3 style='text-align: center;'>Enter Your Username to Track Your Rank:</h3>", unsafe_allow_html=True)
 username = st.text_input("Username", value=st.session_state.get("username", ""), max_chars=15)
 
 if username and "username" not in st.session_state:
@@ -190,18 +190,28 @@ def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new
         st.error(f"❌ Unexpected error updating Google Sheet: {e}")
 
 def process_vote(selected_player):
-    if selected_player == player1["name"]:
-        new_elo1, new_elo2 = calculate_elo(player1["elo"], player2["elo"])
-    else:
-        new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
+    # ✅ Show Status Message While Processing
+    with st.status("Submitting your pick and adjusting the rankings! ⏳\n\nIt takes about 6 seconds...", expanded=True) as status:
+        
+        if selected_player == player1["name"]:
+            new_elo1, new_elo2 = calculate_elo(player1["elo"], player2["elo"])
+        else:
+            new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
 
-    # ✅ Ensure only 1 vote is counted per selection
-    update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2)
-    update_user_vote(st.session_state["username"], count_vote=True)  # ✅ Count vote here only
+        # ✅ Update Google Sheet (Ensuring Only One API Call)
+        update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2)
+        update_user_vote(st.session_state["username"], count_vote=True)
 
-    # ✅ Store new Elo values in session state
-    st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
-    st.session_state["selected_player"] = selected_player
+        # ✅ Store new Elo values in session state
+        st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
+        st.session_state["selected_player"] = selected_player
+
+        # ✅ Wait 6 Seconds for Google Sheets API Call to Complete (Prevents UI Glitching)
+        time.sleep(6)
+
+        # ✅ Update Status to Completed
+        status.update(label="✅ Pick Submitted! Rankings Updated.", state="complete")
+
 
 def display_player(player, col):
     with col:
