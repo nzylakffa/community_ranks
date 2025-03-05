@@ -74,8 +74,8 @@ def get_player_elo(player_name):
         st.error(f"❌ Error fetching player Elo: {e}")
         return None
 
-def get_user_data():
-    if "user_data_cache" not in st.session_state:  # ✅ Cache results
+def get_user_data(force_refresh=False):
+    if force_refresh or "user_data_cache" not in st.session_state:  # ✅ Cache results & allow refresh only when needed
         data = votes_sheet.get_all_records()
 
         if not data:
@@ -383,16 +383,16 @@ if st.session_state["selected_player"]:
             # ✅ Select new Player 1 instantly from cached players
             st.session_state["player1"] = aggressive_weighted_selection(players)
     
-            # ✅ Filter `player2_candidates` only if Player 1 has changed
-            if "last_player1" not in st.session_state or st.session_state["last_player1"] != st.session_state["player1"]["name"]:
-                st.session_state["player2_candidates"] = players[
-                    (players["elo"] > st.session_state["player1"]["elo"] - 50) &
+            # ✅ Get Player 2 Candidates from Cache
+            if "player2_candidates_cache" not in st.session_state or st.session_state["last_player1"] != st.session_state["player1"]["name"]:
+                st.session_state["player2_candidates_cache"] = players[
+                    (players["elo"] > st.session_state["player1"]["elo"] - 50) & 
                     (players["elo"] < st.session_state["player1"]["elo"] + 50)
                 ]
                 st.session_state["last_player1"] = st.session_state["player1"]["name"]  # ✅ Track last Player 1
     
-            # ✅ Select Player 2 instantly
-            st.session_state["player2"] = aggressive_weighted_selection(st.session_state["player2_candidates"]) if not st.session_state["player2_candidates"].empty else aggressive_weighted_selection(players)
+            # ✅ Select Player 2 instantly from cached candidates
+            st.session_state["player2"] = aggressive_weighted_selection(st.session_state["player2_candidates_cache"]) if not st.session_state["player2_candidates_cache"].empty else aggressive_weighted_selection(players)
     
             # ✅ Store Elo data in session state
             st.session_state["initial_elo"] = {
@@ -406,7 +406,8 @@ if st.session_state["selected_player"]:
     
             status.update(label="✅ Next Matchup Ready!", state="complete")
     
-        # ✅ Force rerun AFTER status update
+        # ✅ Avoid unnecessary full rerun by only updating what's needed
         st.rerun()
+
 
     st.markdown("</div>", unsafe_allow_html=True)
