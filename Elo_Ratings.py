@@ -94,16 +94,23 @@ def update_google_sheet(player_name, new_elo):
     try:
         cell = sheet.find(player_name.strip(), case_sensitive=False)
         header_row = sheet.row_values(1)  # Get column headers
+
+        # ✅ Update Elo column dynamically
         if "elo" in header_row:
-            elo_col_index = header_row.index("elo") + 1  # Get column index dynamically
+            elo_col_index = header_row.index("elo") + 1  # Convert to 1-based index
             sheet.update_cell(cell.row, elo_col_index, float(new_elo))  # Convert Elo to number
-            # time.sleep(1)  # Ensure API update completes
-        else:
-            st.error("Elo column not found in Google Sheet")
+
+        # ✅ Update Count column dynamically
+        if "Count" in header_row:
+            count_col_index = header_row.index("Count") + 1  # Convert to 1-based index
+            current_count = sheet.cell(cell.row, count_col_index).value  # Get current count
+            new_count = int(current_count) + 1 if current_count and current_count.isdigit() else 1
+            sheet.update_cell(cell.row, count_col_index, new_count)  # Increment count
+
     except gspread.exceptions.CellNotFound:
-        st.error(f"Player {player_name} not found in Google Sheet")
+        st.error(f"❌ Player {player_name} not found in Google Sheet")
     except Exception as e:
-        st.error(f"Error updating Elo: {str(e)}")
+        st.error(f"❌ Error updating Elo & Count: {str(e)}")
 
 def process_vote(selected_player):
     if selected_player == player1["name"]:
