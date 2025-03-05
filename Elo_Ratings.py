@@ -14,6 +14,8 @@ client = gspread.authorize(creds)  # ✅ Authorizing gspread
 sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # Ensure correct sheet name
 # ✅ New sheet reference for tracking user votes
 votes_sheet = client.open("Community Elo Ratings").worksheet("UserVotes")  # Ensure "UserVotes" exists
+# ✅ New sheet reference for Nick's pick logic
+value_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1Qt7zriA6f696jAeXv3XvzdJPmml8QuplGU9fU-3-SRs/edit").worksheet("Sheet1")  # Adjust sheet name if needed
 
 
 # ✅ Move this below `sheet` initialization
@@ -32,6 +34,29 @@ def get_players():
     except Exception as e:
         st.error(f"❌ Error fetching player data: {e}")
         return pd.DataFrame()
+
+def get_player_value(player_name):
+    """Fetches the Value column for a given player from the second Google Sheet."""
+    try:
+        data = value_sheet.get_all_records()  # Get all records from the sheet
+        df = pd.DataFrame(data)
+
+        # Ensure necessary columns exist
+        if "Player Name" not in df.columns or "Value" not in df.columns:
+            st.error("❌ Error: 'Player Name' or 'Value' column missing in Google Sheet.")
+            return None
+
+        # Find player and get their Value
+        player_row = df[df["Player Name"].str.lower() == player_name.lower()]
+        if not player_row.empty:
+            return float(player_row["Value"].values[0])  # Convert value to float
+        else:
+            return None  # Player not found
+
+    except Exception as e:
+        st.error(f"❌ Error fetching player value: {e}")
+        return None
+
 
 def get_user_data():
     data = votes_sheet.get_all_records()
@@ -136,6 +161,16 @@ if "updated_elo" not in st.session_state:
 
 player1 = st.session_state.player1
 player2 = st.session_state.player2
+
+# ✅ Get player values from the second sheet
+player1_value = get_player_value(player1["name"])
+player2_value = get_player_value(player2["name"])
+
+# ✅ Determine Nick's Pick (Highest Value)
+if player1_value is not None and player2_value is not None:
+    nicks_pick = player1["name"] if player1_value > player2_value else player2["name"]
+else:
+    nicks_pick = "N/A"  # Default if values are missing
 
 # ✅ Username Input (No Extra Vote Count Here)
 st.markdown("<h3 style='text-align: center;'>Enter Your Username to Track Your Rank:</h3>", unsafe_allow_html=True)
@@ -266,6 +301,9 @@ if st.session_state["selected_player"]:
             f"</div>",
             unsafe_allow_html=True
         )
+    # ✅ Display Nick's Pick Below Elo Ratings
+    st.markdown(f"<h4 style='text-align: center;'>🔒 Nick Would Have Picked: <b>{nicks_pick}</b></h4>", unsafe_allow_html=True)
+
 
     # ✅ Load leaderboard data
     df = get_user_data()
