@@ -31,7 +31,7 @@ def get_players():
 players = get_players()
 
 # Elo Calculation (Moved Above Process_Vote)
-def calculate_elo(winner_elo, loser_elo, k=32):
+def calculate_elo(winner_elo, loser_elo, k=24):
     expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
     expected_loser = 1 / (1 + 10 ** ((winner_elo - loser_elo) / 400))
     new_winner_elo = winner_elo + k * (1 - expected_winner)
