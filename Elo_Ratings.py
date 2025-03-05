@@ -24,7 +24,7 @@ def get_players():
         if "elo" not in df.columns or df["elo"].isnull().all():
             df["elo"] = 1500  # Default Elo rating if missing
 
-        df["pos_rank"] = df.groupby("pos")["elo"].rank(method="min", ascending=False).astype(int)
+        df.loc[:, "pos_rank"] = df.groupby("pos")["elo"].rank(method="min", ascending=False).astype(int)
         df = df.sort_values(by="elo", ascending=False)
         return df
     except Exception as e:
@@ -292,6 +292,6 @@ if st.session_state["selected_player"]:
         st.session_state["updated_elo"] = {}
 
         # Rerun Streamlit app to show new matchup
-        st.experimental_rerun()
+        st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
