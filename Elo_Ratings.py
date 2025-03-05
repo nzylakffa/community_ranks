@@ -145,25 +145,40 @@ st.markdown("<h1 style='text-align: center;'>Who Would You Rather Draft?</h1>", 
 
 col1, col2 = st.columns(2)
 
-def update_google_sheet(player_name, new_elo):
+def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new_elo):
     try:
-        cell = sheet.find(player_name.strip(), case_sensitive=False)
+        # Find player positions in Google Sheet
+        cell1 = sheet.find(player1_name.strip(), case_sensitive=False)
+        cell2 = sheet.find(player2_name.strip(), case_sensitive=False)
         header_row = sheet.row_values(1)  # Get column headers
 
-        # ✅ Update Elo column dynamically
+        updates = []
+
+        # ✅ Batch Update for Player 1
         if "elo" in header_row:
             elo_col_index = header_row.index("elo") + 1  # Convert to 1-based index
-            sheet.update_cell(cell.row, elo_col_index, float(new_elo))  # Convert Elo to number
+            updates.append((cell1.row, elo_col_index, float(player1_new_elo)))  # Convert Elo to float
 
-        # ✅ Update Count column dynamically
         if "Votes" in header_row:
             count_col_index = header_row.index("Votes") + 1  # Convert to 1-based index
-            current_count = sheet.cell(cell.row, count_col_index).value  # Get current count
+            current_count = sheet.cell(cell1.row, count_col_index).value  # Get current count
             new_count = int(current_count) + 1 if current_count and current_count.isdigit() else 1
-            sheet.update_cell(cell.row, count_col_index, new_count)  # Increment count
+            updates.append((cell1.row, count_col_index, new_count))  # Increment count
+
+        # ✅ Batch Update for Player 2
+        if "elo" in header_row:
+            updates.append((cell2.row, elo_col_index, float(player2_new_elo)))
+
+        if "Votes" in header_row:
+            current_count = sheet.cell(cell2.row, count_col_index).value  # Get current count
+            new_count = int(current_count) + 1 if current_count and current_count.isdigit() else 1
+            updates.append((cell2.row, count_col_index, new_count))
+
+        # ✅ Apply Batch Updates in One API Call
+        sheet.batch_update([{"range": f"R{row}C{col}", "values": [[value]]} for row, col, value in updates])
 
     except gspread.exceptions.CellNotFound:
-        st.error(f"❌ Player {player_name} not found in Google Sheet")
+        st.error(f"❌ Player not found in Google Sheet")
     except Exception as e:
         st.error(f"❌ Error updating Elo & Count: {str(e)}")
 
@@ -173,11 +188,10 @@ def process_vote(selected_player):
     else:
         new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
 
-    # Update Google Sheet
-    update_google_sheet(player1["name"], new_elo1)
-    update_google_sheet(player2["name"], new_elo2)
+    # ✅ Batch Update Google Sheet (instead of calling update function twice)
+    update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2)
 
-    # Store new Elo values
+    # ✅ Store new Elo values in session state (so UI updates immediately)
     st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
     st.session_state["selected_player"] = selected_player
 
