@@ -24,7 +24,8 @@ def get_players():
         if "elo" not in df.columns or df["elo"].isnull().all():
             df["elo"] = 1500  # Default Elo rating if missing
 
-        df.loc[:, "pos_rank"] = df.groupby("pos")["elo"].rank(method="min", ascending=False).astype(int)
+        df = df.copy()  # ✅ Ensure modifications are made on a fresh copy
+        df["pos_rank"] = df.groupby("pos")["elo"].rank(method="min", ascending=False).astype(int)
         df = df.sort_values(by="elo", ascending=False)
         return df
     except Exception as e:
@@ -262,13 +263,13 @@ if st.session_state["selected_player"]:
     
     # ✅ Display All-Time Leaderboard
     st.markdown("## 🏆 All-Time Leaderboard (Total Votes)")
-    df_all_time = df.sort_values(by="total_votes", ascending=False).head(5)  # Top 5 users
+    df_all_time = df.copy().sort_values(by="total_votes", ascending=False).head(5)  # ✅ Use copy()
     st.dataframe(df_all_time.set_index("username"), hide_index=False, use_container_width=True)
     
     # ✅ Display Weekly Leaderboard
     st.markdown("## ⏳ Weekly Leaderboard (Resets Every Monday)")
     df_weekly = df.sort_values(by="weekly_votes", ascending=False).head(5)  # Top 5 users
-    st.dataframe(df_weekly.set_index("username"), hide_index=False, use_container_width=True)
+    df_weekly = df.copy().sort_values(by="weekly_votes", ascending=False).head(5)  # ✅ Use copy()
 
     # "Next Matchup" button appears here, after Elo ratings are shown
     st.markdown("<div style='text-align: center; margin-top: 20px;'>", unsafe_allow_html=True)
