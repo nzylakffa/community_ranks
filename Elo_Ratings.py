@@ -17,7 +17,6 @@ votes_sheet = client.open("Community Elo Ratings").worksheet("UserVotes")  # Ens
 # ✅ New sheet reference for Nick's pick logic
 value_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1Qt7zriA6f696jAeXv3XvzdJPmml8QuplGU9fU-3-SRs/edit").worksheet("HPPR Rankings")  # Adjust sheet name if needed
 
-
 # ✅ Move this below `sheet` initialization
 def get_players():
     try:
@@ -104,10 +103,6 @@ def update_user_vote(username, count_vote=True):
     # ✅ Send all updates in one batch call
     votes_sheet.batch_update(updates)
 
-
-# ✅ Call `get_players()` AFTER `sheet` is initialized
-players = get_players()
-
 # Elo Calculation (Moved Above Process_Vote)
 def calculate_elo(winner_elo, loser_elo, k=24):
     expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
@@ -115,9 +110,6 @@ def calculate_elo(winner_elo, loser_elo, k=24):
     new_winner_elo = winner_elo + k * (1 - expected_winner)
     new_loser_elo = loser_elo + k * (0 - expected_loser)
     return round(new_winner_elo), round(new_loser_elo)
-
-# # Fetch players and pick two close in Elo with aggressive top weighting
-# players = get_players()
 
 def aggressive_weighted_selection(df, weight_col="elo", alpha=10):
     df = df.copy()  # ✅ Ensure modifications are on a separate copy
@@ -137,6 +129,80 @@ def aggressive_weighted_selection(df, weight_col="elo", alpha=10):
     # Select based on weighted probability
     selected_index = random.choices(df.index, weights=df["weight"], k=1)[0]
     return df.loc[selected_index]
+
+def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new_elo):
+    try:
+        all_values = sheet.get_all_values()
+        header_row = all_values[0]  
+
+        # ✅ Find column indexes dynamically
+        elo_col_index = header_row.index("elo") + 1  
+        votes_col_index = header_row.index("Votes") + 1 if "Votes" in header_row else None  
+
+        # ✅ Find player row positions
+        player1_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player1_name.lower()), None)
+        player2_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player2_name.lower()), None)
+
+        if not player1_row or not player2_row:
+            return  
+
+        updates = [
+            {"range": f"R{player1_row}C{elo_col_index}", "values": [[float(player1_new_elo)]]},
+            {"range": f"R{player2_row}C{elo_col_index}", "values": [[float(player2_new_elo)]]},
+        ]
+
+        if votes_col_index:
+            player1_votes = int(all_values[player1_row - 1][votes_col_index - 1] or 0) + 1
+            player2_votes = int(all_values[player2_row - 1][votes_col_index - 1] or 0) + 1
+            updates.extend([
+                {"range": f"R{player1_row}C{votes_col_index}", "values": [[player1_votes]]},
+                {"range": f"R{player2_row}C{votes_col_index}", "values": [[player2_votes]]},
+            ])
+
+        # ✅ Send batch update in one API call
+        sheet.batch_update(updates)
+
+    except gspread.exceptions.APIError as e:
+        st.error(f"❌ Google Sheets API Error: {e}")
+    except Exception as e:
+        st.error(f"❌ Unexpected error updating Google Sheet: {e}")
+
+def process_vote(selected_player):
+    with st.status("Submitting your pick and adjusting the rankings! ⏳", expanded=False) as status:
+        if selected_player == player1["name"]:
+            new_elo1, new_elo2 = calculate_elo(player1["elo"], player2["elo"])
+        else:
+            new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
+
+        # ✅ Optimize by ensuring minimal API calls
+        update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2)
+        update_user_vote(st.session_state["username"], count_vote=True)
+
+        # ✅ Store results instantly in session state (no extra API calls)
+        st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
+        st.session_state["selected_player"] = selected_player
+
+        # ✅ Instantly update status (without extra sleep)
+        status.update(label="✅ Pick Submitted! Rankings Updated.", state="complete")
+
+def display_player(player, col):
+    with col:
+        st.markdown(
+            f'<div style="padding: 10px; border-radius: 10px; text-align: center;">'
+            f'<img src="{player["image_url"]}" width="150" style="display: block; margin: auto;">'
+            f'<p style="margin-top: 10px; font-size: 16px; text-align: center;">{player["name"]} ({player["team"]} | {player["pos"]})</p>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+
+        if st.button("Draft", key=f"{player['name']}_{col}", use_container_width=True):
+            process_vote(player["name"])
+
+# ✅ Call `get_players()` AFTER `sheet` is initialized
+players = get_players()
+
+# # Fetch players and pick two close in Elo with aggressive top weighting
+# players = get_players()
 
 # Initialize session state variables
 if "player1" not in st.session_state or "player2" not in st.session_state:
@@ -187,76 +253,6 @@ if username and "username" not in st.session_state:
 st.markdown("<h1 style='text-align: center;'>Who Would You Rather Draft?</h1>", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
-
-def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new_elo):
-    try:
-        all_values = sheet.get_all_values()
-        header_row = all_values[0]  
-
-        # ✅ Find column indexes dynamically
-        elo_col_index = header_row.index("elo") + 1  
-        votes_col_index = header_row.index("Votes") + 1 if "Votes" in header_row else None  
-
-        # ✅ Find player row positions
-        player1_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player1_name.lower()), None)
-        player2_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player2_name.lower()), None)
-
-        if not player1_row or not player2_row:
-            return  
-
-        updates = [
-            {"range": f"R{player1_row}C{elo_col_index}", "values": [[float(player1_new_elo)]]},
-            {"range": f"R{player2_row}C{elo_col_index}", "values": [[float(player2_new_elo)]]},
-        ]
-
-        if votes_col_index:
-            player1_votes = int(all_values[player1_row - 1][votes_col_index - 1] or 0) + 1
-            player2_votes = int(all_values[player2_row - 1][votes_col_index - 1] or 0) + 1
-            updates.extend([
-                {"range": f"R{player1_row}C{votes_col_index}", "values": [[player1_votes]]},
-                {"range": f"R{player2_row}C{votes_col_index}", "values": [[player2_votes]]},
-            ])
-
-        # ✅ Send batch update in one API call
-        sheet.batch_update(updates)
-
-    except gspread.exceptions.APIError as e:
-        st.error(f"❌ Google Sheets API Error: {e}")
-    except Exception as e:
-        st.error(f"❌ Unexpected error updating Google Sheet: {e}")
-
-
-def process_vote(selected_player):
-    with st.status("Submitting your pick and adjusting the rankings! ⏳", expanded=False) as status:
-        if selected_player == player1["name"]:
-            new_elo1, new_elo2 = calculate_elo(player1["elo"], player2["elo"])
-        else:
-            new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
-
-        # ✅ Optimize by ensuring minimal API calls
-        update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2)
-        update_user_vote(st.session_state["username"], count_vote=True)
-
-        # ✅ Store results instantly in session state (no extra API calls)
-        st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
-        st.session_state["selected_player"] = selected_player
-
-        # ✅ Instantly update status (without extra sleep)
-        status.update(label="✅ Pick Submitted! Rankings Updated.", state="complete")
-
-
-def display_player(player, col):
-    with col:
-        st.markdown(
-            f'<div style="padding: 10px; border-radius: 10px; text-align: center;">'
-            f'<img src="{player["image_url"]}" width="150" style="display: block; margin: auto;">'
-            f'<p style="margin-top: 10px; font-size: 16px; text-align: center;">{player["name"]} ({player["team"]} | {player["pos"]})</p>'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-
-        if st.button("Draft", key=f"{player['name']}_{col}", use_container_width=True):
-            process_vote(player["name"])
 
 display_player(player1, col1)
 display_player(player2, col2)
