@@ -31,7 +31,6 @@ def get_players():
         st.error(f"❌ Error fetching player data: {e}")
         return pd.DataFrame()
 
-# ✅ Load user vote data from Google Sheets (Handles empty sheets)
 def get_user_data():
     data = votes_sheet.get_all_records()
     
@@ -42,8 +41,7 @@ def get_user_data():
     df = pd.DataFrame(data)
     df.columns = df.columns.str.lower()  # ✅ Ensure lowercase column names for consistency
 
-    st.write("Debug: UserVotes DataFrame", df)  # ✅ Debugging output
-    return df
+    return df  # ✅ Cleaned up, no debug output
 
 def update_user_vote(username):
     df = get_user_data()
