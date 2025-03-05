@@ -255,7 +255,7 @@ def display_player(player, col):
             unsafe_allow_html=True
         )
 
-        if st.button("Draft", key=player["name"], use_container_width=True):
+        if st.button("Draft", key=f"{player['name']}_{col}", use_container_width=True):
             process_vote(player["name"])
 
 display_player(player1, col1)
