@@ -190,26 +190,23 @@ col1, col2 = st.columns(2)
 
 def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new_elo):
     try:
-        # ✅ Read Google Sheet only ONCE at the start
         all_values = sheet.get_all_values()
-        header_row = all_values[0]  # Get column headers
-        
+        header_row = all_values[0]  
+
         # ✅ Find column indexes dynamically
-        elo_col_index = header_row.index("elo") + 1  # Convert to 1-based index
-        votes_col_index = header_row.index("Votes") + 1 if "Votes" in header_row else None
-        
-        # ✅ Find player row positions only ONCE
+        elo_col_index = header_row.index("elo") + 1  
+        votes_col_index = header_row.index("Votes") + 1 if "Votes" in header_row else None  
+
+        # ✅ Find player row positions
         player1_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player1_name.lower()), None)
         player2_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player2_name.lower()), None)
 
         if not player1_row or not player2_row:
-            st.error("❌ One or both players not found in Google Sheet")
-            return
+            return  
 
-        # ✅ Prepare batch updates
         updates = [
             {"range": f"R{player1_row}C{elo_col_index}", "values": [[float(player1_new_elo)]]},
-            {"range": f"R{player2_row}C{elo_col_index}", "values": [[float(player2_new_elo)]]}
+            {"range": f"R{player2_row}C{elo_col_index}", "values": [[float(player2_new_elo)]]},
         ]
 
         if votes_col_index:
@@ -217,16 +214,17 @@ def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new
             player2_votes = int(all_values[player2_row - 1][votes_col_index - 1] or 0) + 1
             updates.extend([
                 {"range": f"R{player1_row}C{votes_col_index}", "values": [[player1_votes]]},
-                {"range": f"R{player2_row}C{votes_col_index}", "values": [[player2_votes]]}
+                {"range": f"R{player2_row}C{votes_col_index}", "values": [[player2_votes]]},
             ])
 
-        # ✅ Send a SINGLE batch update to reduce API calls
+        # ✅ Send batch update in one API call
         sheet.batch_update(updates)
 
     except gspread.exceptions.APIError as e:
         st.error(f"❌ Google Sheets API Error: {e}")
     except Exception as e:
         st.error(f"❌ Unexpected error updating Google Sheet: {e}")
+
 
 def process_vote(selected_player):
     # ✅ Show Status Message While Processing
