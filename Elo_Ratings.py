@@ -15,7 +15,7 @@ sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # Ensure corre
 # ✅ New sheet reference for tracking user votes
 votes_sheet = client.open("Community Elo Ratings").worksheet("UserVotes")  # Ensure "UserVotes" exists
 # ✅ New sheet reference for Nick's pick logic
-value_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1Qt7zriA6f696jAeXv3XvzdJPmml8QuplGU9fU-3-SRs/edit").worksheet("Sheet1")  # Adjust sheet name if needed
+value_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1Qt7zriA6f696jAeXv3XvzdJPmml8QuplGU9fU-3-SRs/edit").worksheet("HPPR Rankings")  # Adjust sheet name if needed
 
 
 # ✅ Move this below `sheet` initialization
