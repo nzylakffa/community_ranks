@@ -386,7 +386,7 @@ if st.session_state["selected_player"]:
     st.dataframe(df_all_time.set_index("Rank"), hide_index=False, use_container_width=True)
     
     # ⏳ Weekly Leaderboard (Sorted by Weekly Votes)
-    st.markdown("## ⏳ Weekly Leaderboard (Resets Every Monday)")
+    st.markdown("## ⏳ Weekly Leaderboard (Resets on Monday)")
     df_weekly = df.copy().sort_values(by="weekly_votes", ascending=False).head(5)  # Sort by weekly votes
     df_weekly["Rank"] = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][: len(df_weekly)]  # Assign ranking icons
     df_weekly = df_weekly.rename(
