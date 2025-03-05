@@ -180,13 +180,12 @@ def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new
             updates.append({"range": f"R{player2_row_idx}C{elo_col_index}", "values": [[float(player2_new_elo)]]})
 
         if votes_col_index:
-            player1_votes = int(player1_row["Votes"].values[0]) + 1
-            player2_votes = int(player2_row["Votes"].values[0]) + 1
-
-            if player1_votes != int(player1_row["Votes"].values[0]):
-                updates.append({"range": f"R{player1_row_idx}C{votes_col_index}", "values": [[player1_votes]]})
-            if player2_votes != int(player2_row["Votes"].values[0]):
-                updates.append({"range": f"R{player2_row_idx}C{votes_col_index}", "values": [[player2_votes]]})
+            # ✅ Read votes directly from Google Sheets instead of cache
+            player1_votes = int(sheet.cell(player1_row_idx, votes_col_index).value or 0) + 1
+            player2_votes = int(sheet.cell(player2_row_idx, votes_col_index).value or 0) + 1
+        
+            updates.append({"range": f"R{player1_row_idx}C{votes_col_index}", "values": [[player1_votes]]})
+            updates.append({"range": f"R{player2_row_idx}C{votes_col_index}", "values": [[player2_votes]]})
 
         if updates:
             sheet.batch_update(updates)  # ✅ Only update if changes were detected
