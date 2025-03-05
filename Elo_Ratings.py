@@ -220,9 +220,13 @@ def process_vote(selected_player):
         else:
             new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
 
-        # ✅ Optimize by ensuring minimal API calls
-        update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2)
-        update_user_vote(st.session_state["username"], count_vote=True)
+        # ✅ Ensure we pass player_data from `get_players()` to avoid read requests
+        player_data = get_players()
+        update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2, player_data)
+
+        # ✅ Ensure user data is passed correctly
+        user_data = get_user_data()
+        update_user_vote(st.session_state["username"], count_vote=True, user_data=user_data)
 
         # ✅ Store results instantly in session state (no extra API calls)
         st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
