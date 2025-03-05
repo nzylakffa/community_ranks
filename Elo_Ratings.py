@@ -120,6 +120,7 @@ def update_user_vote(username, count_vote=True):
 
     if updates:
         votes_sheet.batch_update(updates)  # ✅ Only send updates if needed
+        st.session_state["user_data_cache"] = get_user_data(force_refresh=True)  # ✅ Refresh cached votes
 
 # Elo Calculation (Moved Above Process_Vote)
 def calculate_elo(winner_elo, loser_elo, k=24):
