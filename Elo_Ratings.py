@@ -74,32 +74,35 @@ def update_user_vote(username, count_vote=True):
     df = get_user_data()
     today = datetime.date.today().strftime("%Y-%m-%d")
 
-    # ✅ If DataFrame is empty or username doesn't exist, add the user
+    # ✅ If user does not exist, add them
     if df.empty or username not in df["username"].values:
-        votes_sheet.append_row([username, 1 if count_vote else 0, 1 if count_vote else 0, today])  # ✅ Initialize with 1 vote only if count_vote=True
-        return  # ✅ Exit after adding a new user
+        votes_sheet.append_row([username, 1 if count_vote else 0, 1 if count_vote else 0, today])  
+        return  
 
-    # ✅ If user exists, update their vote counts
-    row_idx = df[df["username"] == username].index[0] + 2  # Adjust for Google Sheets index
+    # ✅ If user exists, update in a batch call (minimizing API requests)
+    row_idx = df[df["username"] == username].index[0] + 2  
 
-    # ✅ Retrieve current vote counts, handling empty values
-    total_votes = votes_sheet.cell(row_idx, 2).value  # Column 2 = total_votes
-    weekly_votes = votes_sheet.cell(row_idx, 3).value  # Column 3 = weekly_votes
-    last_voted = votes_sheet.cell(row_idx, 4).value  # Column 4 = last_voted (date)
+    values = votes_sheet.row_values(row_idx)
+    total_votes = int(values[1]) if values[1].isdigit() else 0  
+    weekly_votes = int(values[2]) if values[2].isdigit() else 0  
+    last_voted = values[3]  
 
-    total_votes = int(total_votes) if total_votes and total_votes.isdigit() else 0  # ✅ Handle empty values
-    weekly_votes = int(weekly_votes) if weekly_votes and weekly_votes.isdigit() else 0  # ✅ Handle empty values
+    updates = []
 
     # ✅ Reset weekly votes if it's Monday and last vote was before today
     if datetime.datetime.today().weekday() == 0 and last_voted != today:
-        votes_sheet.update_cell(row_idx, 3, 0)  # ✅ Reset weekly_votes
+        updates.append({"range": f"R{row_idx}C3", "values": [[0]]})
 
-    # ✅ Only count votes once per selection
     if count_vote:
-        votes_sheet.update_cell(row_idx, 2, total_votes + 1)  # Increment total_votes
-        votes_sheet.update_cell(row_idx, 3, weekly_votes + 1)  # Increment weekly_votes
-    
-    votes_sheet.update_cell(row_idx, 4, today)  # ✅ Update last_voted date
+        updates.extend([
+            {"range": f"R{row_idx}C2", "values": [[total_votes + 1]]},
+            {"range": f"R{row_idx}C3", "values": [[weekly_votes + 1]]},
+        ])
+
+    updates.append({"range": f"R{row_idx}C4", "values": [[today]]})
+
+    # ✅ Send all updates in one batch call
+    votes_sheet.batch_update(updates)
 
 
 # ✅ Call `get_players()` AFTER `sheet` is initialized
