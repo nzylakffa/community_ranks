@@ -97,15 +97,21 @@ def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new
     player2_row = df[df["name"].str.lower() == player2_name.lower()].index[0] + 2
 
     updates = []
+    
+    # ✅ Convert Elo values to float (avoids JSON serialization error)
     updates.append({"range": f"R{player1_row}C{elo_col_index}", "values": [[float(player1_new_elo)]]})
     updates.append({"range": f"R{player2_row}C{elo_col_index}", "values": [[float(player2_new_elo)]]})
 
     if votes_col_index:
-        updates.append({"range": f"R{player1_row}C{votes_col_index}", "values": [[df.loc[player1_row - 2, "Votes"] + 1]]})
-        updates.append({"range": f"R{player2_row}C{votes_col_index}", "values": [[df.loc[player2_row - 2, "Votes"] + 1]]})
+        # ✅ Convert Votes from `int64` to standard Python `int`
+        new_player1_votes = int(df.loc[player1_row - 2, "Votes"]) + 1
+        new_player2_votes = int(df.loc[player2_row - 2, "Votes"]) + 1
 
+        updates.append({"range": f"R{player1_row}C{votes_col_index}", "values": [[new_player1_votes]]})
+        updates.append({"range": f"R{player2_row}C{votes_col_index}", "values": [[new_player2_votes]]})
+
+    # ✅ Send batch update to Google Sheets (single API call)
     elo_sheet.batch_update(updates)
-
 
 ### ✅ **Process Vote (Now Uses Preloaded Data)**
 def process_vote(selected_player):
