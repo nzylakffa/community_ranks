@@ -52,8 +52,11 @@ def get_player_value(player_name):
     return float(player_row["Value"].values[0]) if not player_row.empty else None
 
 
-def update_user_vote(username, user_data, count_vote=True):
+def update_user_vote(username, count_vote=True, user_data=None):
     """Updates user vote data in Google Sheets without extra read requests."""
+    if user_data is None:
+        user_data = get_user_data()  # Ensure user data is loaded
+
     df = user_data  # Use preloaded data
     username_lower = username.lower()
 
@@ -68,7 +71,7 @@ def update_user_vote(username, user_data, count_vote=True):
     row_idx = user_row.index[0] + 2  # Adjust for Google Sheets indexing
     total_votes_col, weekly_votes_col, last_voted_col = 2, 3, 4
 
-    # Get current values
+    # Get current values (convert to int if necessary)
     user_current_total = int(df.loc[user_row.index[0], "total_votes"])
     user_current_weekly = int(df.loc[user_row.index[0], "weekly_votes"])
     user_last_voted = df.loc[user_row.index[0], "last_voted"]
