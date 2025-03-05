@@ -147,7 +147,7 @@ def calculate_elo(winner_elo, loser_elo, k=24):
     new_loser_elo = loser_elo + k * (0 - expected_loser)
     return round(new_winner_elo), round(new_loser_elo)
 
-def aggressive_weighted_selection(df, weight_col="elo", alpha=10):
+def aggressive_weighted_selection(df, weight_col="elo", alpha=6):
     df = df.copy()  # ✅ Ensure modifications are on a separate copy
 
     max_elo = df[weight_col].max()
