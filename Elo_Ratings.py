@@ -169,8 +169,15 @@ def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new
         if player1_row.empty or player2_row.empty:
             return  # ✅ Prevent errors if players aren't found
 
-        player1_row_idx = player1_row.index[0] + 2
-        player2_row_idx = player2_row.index[0] + 2
+        # ✅ Dynamically find player row to prevent incorrect updates if sorting changes
+        all_values = sheet.get_all_values()  # ✅ Get all player names & rows
+        player1_row_idx = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player1_name.lower()), None)
+        player2_row_idx = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player2_name.lower()), None)
+        
+        if not player1_row_idx or not player2_row_idx:
+            st.error(f"❌ Could not find player rows in Google Sheet for {player1_name} or {player2_name}.")
+            return  # ✅ Prevent updating the wrong player
+
 
         updates = []
 
