@@ -347,27 +347,33 @@ if st.session_state["selected_player"]:
     st.markdown("<div style='text-align: center; margin-top: 20px;'>", unsafe_allow_html=True)
 
     if st.button("Next Matchup", key="next_matchup", use_container_width=True):
-        with st.status("Loading next matchup... ⏳", expanded=False) as status:
-            # ✅ Select new players efficiently
-            st.session_state["player1"] = aggressive_weighted_selection(players)
-            st.session_state["player2_candidates"] = players[
-                (players["elo"] > st.session_state["player1"]["elo"] - 50) & (players["elo"] < st.session_state["player1"]["elo"] + 50)
-            ]
-            st.session_state["player2"] = aggressive_weighted_selection(st.session_state["player2_candidates"]) if not st.session_state["player2_candidates"].empty else aggressive_weighted_selection(players)
+        # ✅ Prevent repeated reruns
+        if "loading_matchup" not in st.session_state:
+            st.session_state["loading_matchup"] = True  # Track that we're loading
     
-            # ✅ Store Elo data in session state
-            st.session_state["initial_elo"] = {
-                st.session_state["player1"]["name"]: st.session_state["player1"]["elo"],
-                st.session_state["player2"]["name"]: st.session_state["player2"]["elo"]
-            }
+        if st.session_state["loading_matchup"]:
+            with st.status("Loading next matchup... ⏳", expanded=False) as status:
+                # ✅ Select new players efficiently
+                st.session_state["player1"] = aggressive_weighted_selection(players)
+                st.session_state["player2_candidates"] = players[
+                    (players["elo"] > st.session_state["player1"]["elo"] - 50) & (players["elo"] < st.session_state["player1"]["elo"] + 50)
+                ]
+                st.session_state["player2"] = aggressive_weighted_selection(st.session_state["player2_candidates"]) if not st.session_state["player2_candidates"].empty else aggressive_weighted_selection(players)
     
-            # ✅ Reset session state values without unnecessary API calls
-            st.session_state["selected_player"] = None
-            st.session_state["updated_elo"] = {}
+                # ✅ Store Elo data in session state
+                st.session_state["initial_elo"] = {
+                    st.session_state["player1"]["name"]: st.session_state["player1"]["elo"],
+                    st.session_state["player2"]["name"]: st.session_state["player2"]["elo"]
+                }
     
-            status.update(label="✅ Next Matchup Ready!", state="complete")
-
-    st.rerun()
-
+                # ✅ Reset session state values
+                st.session_state["selected_player"] = None
+                st.session_state["updated_elo"] = {}
+    
+                status.update(label="✅ Next Matchup Ready!", state="complete")
+    
+            # ✅ Reset flag and rerun AFTER the status message updates
+            st.session_state["loading_matchup"] = False  
+            st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
