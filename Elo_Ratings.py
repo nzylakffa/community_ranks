@@ -110,20 +110,23 @@ def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new
 ### ✅ **Process Vote (Now Uses Preloaded Data)**
 def process_vote(selected_player):
     with st.status("Submitting your pick and adjusting the rankings! ⏳", expanded=False) as status:
-        player_data = get_players()
-        user_data = get_user_data()
+        player_data = get_players()  # ✅ Load players from the Google Sheet
+        user_data = get_user_data()  # ✅ Load user data from the Google Sheet
 
         if selected_player == player1["name"]:
             new_elo1, new_elo2 = calculate_elo(player1["elo"], player2["elo"])
         else:
             new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
 
+        # ✅ Now passing `player_data` correctly to avoid the TypeError
         update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2, player_data)
         update_user_vote(st.session_state["username"], count_vote=True, user_data=user_data)
 
         st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
         st.session_state["selected_player"] = selected_player
+
         status.update(label="✅ Pick Submitted! Rankings Updated.", state="complete")
+
 
 
 def get_player_elo(player_name):
