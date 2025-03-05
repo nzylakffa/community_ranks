@@ -192,7 +192,8 @@ def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new
 
 def process_vote(selected_player):
     # ✅ Show Status Message While Processing
-    with st.status("Submitting your pick and adjusting the rankings! ⏳\n\nIt takes about 6 seconds...", expanded=False) as status:
+    with st.status("Submitting your pick and adjusting the rankings! ⏳", expanded=True) as status:
+        st.write("Processing your pick...")
         
         if selected_player == player1["name"]:
             new_elo1, new_elo2 = calculate_elo(player1["elo"], player2["elo"])
@@ -206,9 +207,6 @@ def process_vote(selected_player):
         # ✅ Store new Elo values in session state
         st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
         st.session_state["selected_player"] = selected_player
-
-        # ✅ Wait 6 Seconds for Google Sheets API Call to Complete (Prevents UI Glitching)
-        time.sleep(6)
 
         # ✅ Update Status to Completed
         status.update(label="✅ Pick Submitted! Rankings Updated.", state="complete")
