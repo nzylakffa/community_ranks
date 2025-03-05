@@ -4,12 +4,16 @@ from google.oauth2.service_account import Credentials
 import json
 import pandas as pd
 import random
+import datetime
 
 creds_dict = st.secrets["gcp_service_account"]
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
 client = gspread.authorize(creds)  # ✅ Authorizing gspread
 sheet = client.open("Community Elo Ratings").worksheet("Sheet1")  # Ensure correct sheet name
+# ✅ New sheet reference for tracking user votes
+votes_sheet = client.open("Community Elo Ratings").worksheet("UserVotes")  # Ensure "UserVotes" exists
+
 
 # ✅ Move this below `sheet` initialization
 def get_players():
@@ -26,6 +30,35 @@ def get_players():
     except Exception as e:
         st.error(f"❌ Error fetching player data: {e}")
         return pd.DataFrame()
+
+# ✅ Load user vote data from Google Sheets
+def get_user_data():
+    data = votes_sheet.get_all_records()
+    return pd.DataFrame(data)
+
+# ✅ Update votes for a user and reset weekly votes on Monday
+def update_user_vote(username):
+    df = get_user_data()
+    today = datetime.date.today().strftime("%Y-%m-%d")
+    
+    if username in df["username"].values:
+        row_idx = df[df["username"] == username].index[0] + 2  # Adjust index for Google Sheets
+        total_votes = int(votes_sheet.cell(row_idx, 2).value)  # Column 2 = total_votes
+        weekly_votes = int(votes_sheet.cell(row_idx, 3).value)  # Column 3 = weekly_votes
+        last_voted = votes_sheet.cell(row_idx, 4).value  # Column 4 = last_voted (date)
+
+        # ✅ Reset weekly votes if it's Monday and last vote was before today
+        if datetime.datetime.today().weekday() == 0 and last_voted != today:
+            votes_sheet.update_cell(row_idx, 3, 0)  # Reset weekly_votes
+
+        # ✅ Update vote counts
+        votes_sheet.update_cell(row_idx, 2, total_votes + 1)  # Increment total_votes
+        votes_sheet.update_cell(row_idx, 3, weekly_votes + 1)  # Increment weekly_votes
+        votes_sheet.update_cell(row_idx, 4, today)  # Update last_voted date
+    else:
+        # ✅ Add new user if not found
+        votes_sheet.append_row([username, 1, 1, today])  # [username, total_votes, weekly_votes, last_voted]
+
 
 # ✅ Call `get_players()` AFTER `sheet` is initialized
 players = get_players()
@@ -84,6 +117,14 @@ if "updated_elo" not in st.session_state:
 
 player1 = st.session_state.player1
 player2 = st.session_state.player2
+
+# ✅ Username Input
+st.markdown("### Enter Your Username to Track Your Rank:")
+username = st.text_input("Username", value=st.session_state.get("username", ""), max_chars=15)
+
+if username:
+    st.session_state["username"] = username
+    update_user_vote(username)  # ✅ Track votes in Google Sheets
 
 # Streamlit UI
 st.markdown("<h1 style='text-align: center;'>Who Would You Rather Draft?</h1>", unsafe_allow_html=True)
@@ -183,6 +224,18 @@ if st.session_state["selected_player"]:
             unsafe_allow_html=True
         )
 
+    # ✅ Load leaderboard data
+    df = get_user_data()
+    
+    # ✅ Display All-Time Leaderboard
+    st.markdown("## 🏆 All-Time Leaderboard (Total Votes)")
+    df_all_time = df.sort_values(by="total_votes", ascending=False).head(5)  # Top 5 users
+    st.table(df_all_time)
+    
+    # ✅ Display Weekly Leaderboard
+    st.markdown("## ⏳ Weekly Leaderboard (Resets Every Monday)")
+    df_weekly = df.sort_values(by="weekly_votes", ascending=False).head(5)  # Top 5 users
+    st.table(df_weekly)
 
     # "Next Matchup" button appears here, after Elo ratings are shown
     st.markdown("<div style='text-align: center; margin-top: 20px;'>", unsafe_allow_html=True)
@@ -209,4 +262,3 @@ if st.session_state["selected_player"]:
         st.experimental_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
-
