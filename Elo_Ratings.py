@@ -74,8 +74,9 @@ def get_player_elo(player_name):
         st.error(f"❌ Error fetching player Elo: {e}")
         return None
 
-def get_user_data():
-    if "user_data_cache" not in st.session_state:  # ✅ Cache results
+def get_user_data(force_refresh=False):
+    """Fetch user vote data from Google Sheets with optional cache refresh."""
+    if force_refresh or "user_data_cache" not in st.session_state:  # ✅ Refresh if needed
         data = votes_sheet.get_all_records()
 
         if not data:
