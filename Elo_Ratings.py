@@ -147,40 +147,43 @@ col1, col2 = st.columns(2)
 
 def update_google_sheet(player1_name, player1_new_elo, player2_name, player2_new_elo):
     try:
-        # Find player positions in Google Sheet
-        cell1 = sheet.find(player1_name.strip(), case_sensitive=False)
-        cell2 = sheet.find(player2_name.strip(), case_sensitive=False)
-        header_row = sheet.row_values(1)  # Get column headers
+        # ✅ Read Google Sheet only ONCE at the start
+        all_values = sheet.get_all_values()
+        header_row = all_values[0]  # Get column headers
+        
+        # ✅ Find column indexes dynamically
+        elo_col_index = header_row.index("elo") + 1  # Convert to 1-based index
+        votes_col_index = header_row.index("Votes") + 1 if "Votes" in header_row else None
+        
+        # ✅ Find player row positions only ONCE
+        player1_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player1_name.lower()), None)
+        player2_row = next((i + 1 for i, row in enumerate(all_values) if row and row[0].strip().lower() == player2_name.lower()), None)
 
-        updates = []
+        if not player1_row or not player2_row:
+            st.error("❌ One or both players not found in Google Sheet")
+            return
 
-        # ✅ Batch Update for Player 1
-        if "elo" in header_row:
-            elo_col_index = header_row.index("elo") + 1  # Convert to 1-based index
-            updates.append((cell1.row, elo_col_index, float(player1_new_elo)))  # Convert Elo to float
+        # ✅ Prepare batch updates
+        updates = [
+            {"range": f"R{player1_row}C{elo_col_index}", "values": [[float(player1_new_elo)]]},
+            {"range": f"R{player2_row}C{elo_col_index}", "values": [[float(player2_new_elo)]]}
+        ]
 
-        if "Votes" in header_row:
-            count_col_index = header_row.index("Votes") + 1  # Convert to 1-based index
-            current_count = sheet.cell(cell1.row, count_col_index).value  # Get current count
-            new_count = int(current_count) + 1 if current_count and current_count.isdigit() else 1
-            updates.append((cell1.row, count_col_index, new_count))  # Increment count
+        if votes_col_index:
+            player1_votes = int(all_values[player1_row - 1][votes_col_index - 1] or 0) + 1
+            player2_votes = int(all_values[player2_row - 1][votes_col_index - 1] or 0) + 1
+            updates.extend([
+                {"range": f"R{player1_row}C{votes_col_index}", "values": [[player1_votes]]},
+                {"range": f"R{player2_row}C{votes_col_index}", "values": [[player2_votes]]}
+            ])
 
-        # ✅ Batch Update for Player 2
-        if "elo" in header_row:
-            updates.append((cell2.row, elo_col_index, float(player2_new_elo)))
+        # ✅ Send a SINGLE batch update to reduce API calls
+        sheet.batch_update(updates)
 
-        if "Votes" in header_row:
-            current_count = sheet.cell(cell2.row, count_col_index).value  # Get current count
-            new_count = int(current_count) + 1 if current_count and current_count.isdigit() else 1
-            updates.append((cell2.row, count_col_index, new_count))
-
-        # ✅ Apply Batch Updates in One API Call
-        sheet.batch_update([{"range": f"R{row}C{col}", "values": [[value]]} for row, col, value in updates])
-
-    except gspread.exceptions.CellNotFound:
-        st.error(f"❌ Player not found in Google Sheet")
+    except gspread.exceptions.APIError as e:
+        st.error(f"❌ Google Sheets API Error: {e}")
     except Exception as e:
-        st.error(f"❌ Error updating Elo & Count: {str(e)}")
+        st.error(f"❌ Unexpected error updating Google Sheet: {e}")
 
 def process_vote(selected_player):
     if selected_player == player1["name"]:
@@ -188,10 +191,10 @@ def process_vote(selected_player):
     else:
         new_elo2, new_elo1 = calculate_elo(player2["elo"], player1["elo"])
 
-    # ✅ Batch Update Google Sheet (instead of calling update function twice)
+    # ✅ Single batch update instead of multiple read/write calls
     update_google_sheet(player1["name"], new_elo1, player2["name"], new_elo2)
 
-    # ✅ Store new Elo values in session state (so UI updates immediately)
+    # ✅ Store new Elo values in session state to update UI instantly
     st.session_state["updated_elo"] = {player1["name"]: new_elo1, player2["name"]: new_elo2}
     st.session_state["selected_player"] = selected_player
 
