@@ -5,6 +5,7 @@ import json
 import pandas as pd
 import random
 import datetime
+import time
 
 creds_dict = st.secrets["gcp_service_account"]
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
