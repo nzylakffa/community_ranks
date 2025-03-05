@@ -261,15 +261,35 @@ if st.session_state["selected_player"]:
     # ✅ Load leaderboard data
     df = get_user_data()
     
-    # ✅ Display All-Time Leaderboard
+    # 🏆 Display Leaderboards with Rankings & Better Formatting
     st.markdown("## 🏆 All-Time Leaderboard (Total Votes)")
-    df_all_time = df.copy().sort_values(by="total_votes", ascending=False).head(5)  # ✅ Use copy()
-    st.dataframe(df_all_time.set_index("username"), hide_index=False, use_container_width=True)
+    df_all_time = df.copy().sort_values(by="total_votes", ascending=False).head(5)  # Sort by total votes
+    df_all_time["Rank"] = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][: len(df_all_time)]  # Assign ranking icons
+    df_all_time = df_all_time.rename(
+        columns={
+            "username": "Username",
+            "total_votes": "Total Votes",
+            "weekly_votes": "Weekly Votes",
+            "last_voted": "Last Voted"
+        }
+    )  # ✅ Rename columns
+    df_all_time = df_all_time[["Rank", "Username", "Total Votes", "Weekly Votes", "Last Voted"]]  # Keep relevant columns
+    st.dataframe(df_all_time.set_index("Rank"), hide_index=False, use_container_width=True)
     
-    # ✅ Display Weekly Leaderboard
     st.markdown("## ⏳ Weekly Leaderboard (Resets Every Monday)")
-    df_weekly = df.copy().sort_values(by="weekly_votes", ascending=False).head(5)  # ✅ Use copy()
-    st.dataframe(df_all_time.set_index("username"), hide_index=False, use_container_width=True)
+    df_weekly = df.copy().sort_values(by="weekly_votes", ascending=False).head(5)  # Sort by weekly votes
+    df_weekly["Rank"] = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][: len(df_weekly)]  # Assign ranking icons
+    df_weekly = df_weekly.rename(
+        columns={
+            "username": "Username",
+            "total_votes": "Total Votes",
+            "weekly_votes": "Weekly Votes",
+            "last_voted": "Last Voted"
+        }
+    )  # ✅ Rename columns
+    df_weekly = df_weekly[["Rank", "Username", "Total Votes", "Weekly Votes", "Last Voted"]]  # Keep relevant columns
+    st.dataframe(df_weekly.set_index("Rank"), hide_index=False, use_container_width=True)
+
 
     # "Next Matchup" button appears here, after Elo ratings are shown
     st.markdown("<div style='text-align: center; margin-top: 20px;'>", unsafe_allow_html=True)
