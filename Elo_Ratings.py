@@ -102,7 +102,18 @@ def update_user_vote(username, count_vote=True):
         return
 
 
-    row_idx = df[df["username"] == username].index[0] + 2
+    # ✅ Ensure username lookup is case-insensitive
+    username_lower = username.lower()
+    df["username"] = df["username"].str.lower()
+    
+    # ✅ Find the row dynamically
+    user_row = df[df["username"] == username_lower]
+    
+    if user_row.empty:
+        st.error(f"❌ Could not find user '{username}' in Google Sheet.")
+        return  # ✅ Prevent crash if user isn't found
+    
+    row_idx = user_row.index[0] + 2  # ✅ Safe lookup
     values = votes_sheet.row_values(row_idx)
 
     total_votes = int(values[1]) if values[1].isdigit() else 0
